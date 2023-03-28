@@ -1,0 +1,8 @@
+data
+logs
+tmp
+__pycache__
+lib/__pycache__
+feature_extractor/__pycache__
+feature_extractor/ckpts
+feature_extractor/.ipynb_checkpoints

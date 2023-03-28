@@ -1,0 +1,14 @@
+numpy
+scipy
+tqdm
+lpips
+imageio
+imageio-ffmpeg
+opencv-python
+scikit-learn
+dearpygui
+tqdm
+matplotlib
+mmcv
+einops
+torch_efficient_distloss
