@@ -3,7 +3,7 @@ from tqdm import tqdm
 import time
 
 @torch.no_grad()
-def dev_region_grower(mask_grid, feature_grid, sigma_d, sigma_f, pad_fg):
+def dev_region_grower(mask_grid, feature_grid, grid, sigma_d, sigma_f, sigma_c, pad_fg):
     torch.cuda.empty_cache()
     DEVICE = "cuda:0"
 
@@ -13,11 +13,14 @@ def dev_region_grower(mask_grid, feature_grid, sigma_d, sigma_f, pad_fg):
     mask_grid_padded = torch.nn.functional.pad(mask_grid, padding_array)
     if pad_fg:
         feature_grid_padded = torch.nn.functional.pad(feature_grid, padding_array)
+        grid_padded = torch.nn.functional.pad(grid, padding_array)
     feature_grid_padded = feature_grid
+    grid_padded = grid
     print("\tTime taken to pad the grid.", time.time() - start_time)
     start_time = time.time()
     mask_grid_padded = mask_grid_padded.cuda(torch.device(DEVICE))
     feature_grid_padded = feature_grid_padded.cuda(torch.device(DEVICE))
+    grid_padded = grid_padded.cuda(torch.device(DEVICE))
     print("\tTime taken to move the grids.", time.time() - start_time)
 
     start_time = time.time()
@@ -26,6 +29,8 @@ def dev_region_grower(mask_grid, feature_grid, sigma_d, sigma_f, pad_fg):
     # mask_grid -> [x, y, z]
     feature_grid_padded = feature_grid_padded.squeeze(0)
     feature_grid = feature_grid.squeeze(0)
+    grid_padded = grid_padded.squeeze(0)
+    grid = grid.squeeze(0)
     # feature_grid -> [64, x, y, z]
 
     zero_indices = (mask_grid == 0).nonzero().cuda(torch.device(DEVICE))
@@ -74,20 +79,26 @@ def dev_region_grower(mask_grid, feature_grid, sigma_d, sigma_f, pad_fg):
         # nbd_feature_values = feature_grid_padded[:, batch_shifted[..., 0], batch_shifted[..., 1], batch_shifted[..., 2]] # 64, 27, batch_size
 
         nbd_feature_dist = feature_grid_padded[:, batch_shifted[..., 0], batch_shifted[..., 1], batch_shifted[..., 2]] - feature_grid_padded[:, batch[..., 0], batch[..., 1], batch[..., 2]].unsqueeze(1)
+        nbd_color_dist = grid_padded[:, batch_shifted[..., 0], batch_shifted[..., 1], batch_shifted[..., 2]] - grid_padded[:, batch[..., 0], batch[..., 1], batch[..., 2]].unsqueeze(1)
         # nbd_feature_dist_tmp = (nbd_feature_dist ** 2).sum(0)
         nbd_feature_dist_tmp = nbd_feature_dist.pow_(2).sum(0)
+        nbd_color_dist_tmp = nbd_color_dist.pow_(2).sum(0)
 
         del nbd_feature_dist #, nbd_feature_values
+        del nbd_color_dist
         torch.cuda.empty_cache()
         nbd_feature_dist = nbd_feature_dist_tmp
         e_nbd_feature_dist = torch.exp(-nbd_feature_dist / sigma_f)
 
+        nbd_color_dist = nbd_color_dist_tmp
+        e_nbd_color_dist = torch.exp(-nbd_color_dist / sigma_c)
+
         nbd_spatial_dist = (batch_shifted - batch.unsqueeze(0)).abs().sum(2)
         e_nbd_spatial_dist = torch.exp(-nbd_spatial_dist / sigma_d)
 
-        sum_weight = (e_nbd_feature_dist * e_nbd_spatial_dist).sum(0)
+        sum_weight = (e_nbd_color_dist * e_nbd_feature_dist * e_nbd_spatial_dist).sum(0)
 
-        batch_new_mask = (nbd_mask_values * e_nbd_feature_dist * e_nbd_spatial_dist).sum(0) / sum_weight
+        batch_new_mask = (nbd_mask_values * e_nbd_color_dist * e_nbd_feature_dist * e_nbd_spatial_dist).sum(0) / sum_weight
         new_mask_grid_padded[batch[..., 0], batch[..., 1], batch[..., 2]] = batch_new_mask
 
     new_mask_grid = new_mask_grid_padded[1:-1, 1:-1, 1:-1]
@@ -105,9 +116,9 @@ def dev_region_grower(mask_grid, feature_grid, sigma_d, sigma_f, pad_fg):
     return new_mask_grid
 
 @torch.no_grad()
-def dev_region_grower_mask(mask, fg, sigma_d=5.0, sigma_f=0.5, pad_fg=True):
+def dev_region_grower_mask(mask, fg, g, sigma_d=5.0, sigma_f=0.5, sigma_c=0.5, pad_fg=True):
     start_time = time.time()
-    mask = dev_region_grower(mask, fg, sigma_d, sigma_f, pad_fg)
+    mask = dev_region_grower(mask, fg, g, sigma_d, sigma_f, sigma_c, pad_fg)
     mask[mask > 0.1] = 1.0
     mask[mask <= 0.1] = 0.0
     print("Time taken by one iteration of region growing", time.time() - start_time)

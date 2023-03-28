@@ -1065,6 +1065,16 @@ def reconstruct_feature_grid(render_viewpoints_kwargs):
     return torch.nn.functional.pad(fg, [1] * 6), fg_kmeans
 
 @torch.no_grad()
+def reconstruct_color_grid(render_viewpoints_kwargs):
+    model = render_viewpoints_kwargs['model']
+
+    k0 = model.k0.cuda()
+    g = get_dense_grid_batch_processing(k0).cuda()
+    g -= g.min()
+    g /= g.max()
+    return torch.nn.functional.pad(g, [1] * 6)
+
+@torch.no_grad()
 def do_kmeans_clustering(mask_index, feature_image):
     # normalize before clustering
     height, width = mask_index.shape
@@ -1097,8 +1107,8 @@ def query_kmeans_clustering(faiss_kmeans, fg_kmeans, threshold, xyz):
     return mask
 
 @torch.no_grad()
-def run_region_grower(mask, fg, sigma_d, sigma_f):
-    mask = dev_region_grower_mask(mask, fg, sigma_d, sigma_f, False)
+def run_region_grower(mask, fg, g, sigma_d, sigma_f, sigma_c):
+    mask = dev_region_grower_mask(mask, fg, g, sigma_d, sigma_f, sigma_c, False)
     torch.cuda.empty_cache()
     return mask
 

@@ -32,16 +32,18 @@ def breakpoint_callback(sender, app_data):
 
 def save_masks_callback(sender, app_data):
     dpg.set_value("save mask text", "Generating Masks...")
-    os.makedirs("masks", exist_ok=True)
-    os.makedirs("masks/train", exist_ok=True)
-    os.makedirs("masks/test", exist_ok=True)
+    train = os.path.join(STATE["cfg"].basedir, STATE["cfg"].expname, "masks/train")
+    test = os.path.join(STATE["cfg"].basedir, STATE["cfg"].expname, "masks/test")
+    os.makedirs(os.path.join(STATE["cfg"].basedir, STATE["cfg"].expname, "masks"), exist_ok=True)
+    os.makedirs(os.path.join(train), exist_ok=True)
+    os.makedirs(os.path.join(test), exist_ok=True)
     alpha_threshold = dpg.get_value("alpha threshold")
     masks = run.get_masks(STATE["rvk"], STATE["cfg"], STATE["data_dict"], "train", alpha_threshold)
     for i, mask in enumerate(masks):
-        Image.fromarray((mask * 255).astype(np.uint8)).save(f'masks/train/{i}.png')
+        Image.fromarray((mask * 255).astype(np.uint8)).save(os.path.join(train, f'{i}.png'))
     masks = run.get_masks(STATE["rvk"], STATE["cfg"], STATE["data_dict"], "test", alpha_threshold)
     for i, mask in enumerate(masks):
-        Image.fromarray((mask * 255).astype(np.uint8)).save(f'masks/test/{i}.png')
+        Image.fromarray((mask * 255).astype(np.uint8)).save(os.path.join(test, f'{i}.png'))
     dpg.set_value("save mask text", "Done!")
 
 def save_model_callback(sender, app_data):
@@ -246,7 +248,8 @@ def region_grower_callback(sender, app_data):
         mask = STATE["rvk"]["model"].segmentation_mask.data
         sigma_d = dpg.get_value("sigma_d")
         sigma_f = dpg.get_value("sigma_f")
-        mask = run.run_region_grower(mask, STATE["fg"], sigma_d, sigma_f)
+        sigma_c = dpg.get_value("sigma_c")
+        mask = run.run_region_grower(mask, STATE["fg"], STATE["g"], sigma_d, sigma_f, sigma_c)
         times.append(time.time())
         STATE["prev_mask"] = STATE["rvk"]["model"].segmentation_mask.cpu()
         STATE["rvk"]["model"].segmentation_mask = torch.nn.Parameter(mask, requires_grad=False)
@@ -268,6 +271,8 @@ if __name__ == "__main__":
         STATE["positive_buffer"] = STATE["rvk"]["model"].segmentation_mask.clone()
         STATE["negative_buffer"] = 1.0 - STATE["rvk"]["model"].segmentation_mask.clone()
         STATE["fg"], STATE["fg_kmeans"] = run.reconstruct_feature_grid(STATE["rvk"])
+        STATE["fg"] = STATE["fg"]
+        STATE["g"] = run.reconstruct_color_grid(STATE["rvk"])
         STATE["height"], STATE["width"] = STATE["data_dict"]["HW"][0]
         STATE["height"], STATE["width"] = int(STATE["height"]), int(STATE["width"])
         STATE["channels"] = 4
@@ -309,6 +314,7 @@ if __name__ == "__main__":
             with dpg.collapsing_header(label="Region Grower"):
                 dpg.add_slider_double(label="sigma_d", tag="sigma_d", min_value=0.0, max_value=20.0, default_value=1.0)
                 dpg.add_slider_double(label="sigma_f", tag="sigma_f", min_value=0.0, max_value=20.0, default_value=10.0)
+                dpg.add_slider_double(label="sigma_c", tag="sigma_c", min_value=0.0, max_value=20.0, default_value=10.0)
                 dpg.add_button(label="grow region", tag="grow region", callback=region_grower_callback)
                 dpg.add_text(label="region grower text", tag="region grower text", default_value="Not called yet!")
 
