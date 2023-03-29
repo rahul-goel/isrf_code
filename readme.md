@@ -12,7 +12,7 @@ Demonstration on the KITCHEN scene. This shows the demonstration of multiple pos
 
 https://user-images.githubusercontent.com/16517445/228188085-b6db61e2-da98-4f3e-bc57-716ec4d5d70a.mp4
 
-Please note that there are two branches in this repository. The main branch contains the implementation of bilateral search which uses the spatio-semantic distance. The branch "additional_spaces" is an experimental branch which also accounts for the color latent vector of TensoRF for the calculation of search-distance.
+Please note that there are two branches in this repository. The main branch contains the implementation of bilateral search which uses the spatio-semantic distance. The branch [additional_spaces](https://github.com/rahul-goel/isrf_code/tree/additional_spaces) is an experimental branch which also accounts for the color latent vector of TensoRF for the calculation of search-distance.
 
 > If you want 2D masks or 3D masks (stored as checkpoints), you can checkout the data we have released. All the masks are created using our method.
 
