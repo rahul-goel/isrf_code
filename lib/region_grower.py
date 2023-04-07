@@ -3,7 +3,7 @@ from tqdm import tqdm
 import time
 
 @torch.no_grad()
-def dev_region_grower(mask_grid, feature_grid, sigma_d, sigma_f, pad_fg):
+def dev_region_grower(mask_grid, feature_grid, density, sigma_d, sigma_f, pad_fg):
     torch.cuda.empty_cache()
     DEVICE = "cuda:0"
 
@@ -28,7 +28,8 @@ def dev_region_grower(mask_grid, feature_grid, sigma_d, sigma_f, pad_fg):
     feature_grid = feature_grid.squeeze(0)
     # feature_grid -> [64, x, y, z]
 
-    zero_indices = (mask_grid == 0).nonzero().cuda(torch.device(DEVICE))
+    useful = (mask_grid == 0) & (density.squeeze(0).squeeze(0) > 0.001)
+    zero_indices = (useful).nonzero().cuda(torch.device(DEVICE))
     zero_indices += torch.cuda.IntTensor([1, 1, 1], device=torch.device(DEVICE)) # adjust due to padding
 
     shifts = []
@@ -105,9 +106,9 @@ def dev_region_grower(mask_grid, feature_grid, sigma_d, sigma_f, pad_fg):
     return new_mask_grid
 
 @torch.no_grad()
-def dev_region_grower_mask(mask, fg, sigma_d=5.0, sigma_f=0.5, pad_fg=True):
+def dev_region_grower_mask(mask, fg, density, sigma_d=5.0, sigma_f=0.5, pad_fg=True):
     start_time = time.time()
-    mask = dev_region_grower(mask, fg, sigma_d, sigma_f, pad_fg)
+    mask = dev_region_grower(mask, fg, density, sigma_d, sigma_f, pad_fg)
     mask[mask > 0.1] = 1.0
     mask[mask <= 0.1] = 0.0
     print("Time taken by one iteration of region growing", time.time() - start_time)

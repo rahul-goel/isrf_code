@@ -1102,8 +1102,8 @@ def query_kmeans_clustering(faiss_kmeans, fg_kmeans, valid_idx, threshold, xyz):
     return mask
 
 @torch.no_grad()
-def run_region_grower(mask, fg, sigma_d, sigma_f):
-    mask = dev_region_grower_mask(mask, fg, sigma_d, sigma_f, False)
+def run_region_grower(mask, fg, density, sigma_d, sigma_f):
+    mask = dev_region_grower_mask(mask, fg, density, sigma_d, sigma_f, False)
     torch.cuda.empty_cache()
     return mask
 

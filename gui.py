@@ -246,7 +246,7 @@ def region_grower_callback(sender, app_data):
         mask = STATE["rvk"]["model"].segmentation_mask.data
         sigma_d = dpg.get_value("sigma_d")
         sigma_f = dpg.get_value("sigma_f")
-        mask = run.run_region_grower(mask, STATE["fg"], sigma_d, sigma_f)
+        mask = run.run_region_grower(mask, STATE["fg"], STATE["og_density_grid"].cuda(), sigma_d, sigma_f)
         times.append(time.time())
         STATE["prev_mask"] = STATE["rvk"]["model"].segmentation_mask.cpu()
         STATE["rvk"]["model"].segmentation_mask = torch.nn.Parameter(mask, requires_grad=False)
@@ -265,7 +265,7 @@ if __name__ == "__main__":
         STATE["dino_dim"] = args.dino_dim
         STATE["cfg"], STATE["data_dict"], STATE["device"] = run.do_setup(args)
         STATE["rvk"], STATE["optimizer"], STATE["start"] = run.load_model(args, STATE["cfg"], STATE["data_dict"], STATE["device"])
-        STATE["og_density_grid"] = STATE["rvk"]["model"].density.grid.clone().cpu()
+        STATE["og_density_grid"] = STATE["rvk"]["model"].density.grid.clone()
         STATE["positive_buffer"] = STATE["rvk"]["model"].segmentation_mask.clone()
         STATE["negative_buffer"] = 1.0 - STATE["rvk"]["model"].segmentation_mask.clone()
         STATE["fg"], STATE["fg_kmeans"], STATE["valid_idx"] = run.reconstruct_feature_grid(STATE["rvk"], STATE["dino_dim"])
