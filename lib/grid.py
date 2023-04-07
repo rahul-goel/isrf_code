@@ -239,7 +239,7 @@ class MaskGrid(nn.Module):
         return f'mask.shape=list(self.mask.shape)'
 
 
-def get_dense_grid_batch_processing(tensorf: TensoRFGrid):
+def get_dense_grid_batch_processing(tensorf: TensoRFGrid, num_dim: int=64):
     """
     Expects the tensorf to be already on device and processes it on device batchwise.
     Not transferring from cpu to avoid repeated transfers from cpu to device
@@ -249,7 +249,7 @@ def get_dense_grid_batch_processing(tensorf: TensoRFGrid):
     # result_grid = torch.zeros([1, tensorf.channels, *tensorf.world_size], dtype=tensorf.xy_plane.dtype).cpu()
     start_time = time.time()
     # result_grid = torch.stack([torch.zeros([1, *tensorf.world_size], dtype=tensorf.x_vec.dtype).cpu() for _ in range(tensorf.channels)], dim=1)
-    result_grid = torch.zeros([1, tensorf.channels, *tensorf.world_size], dtype=tensorf.x_vec.dtype)
+    result_grid = torch.zeros([1, num_dim, *tensorf.world_size], dtype=tensorf.x_vec.dtype)
     print("Time taken for initializing the grid", time.time() - start_time)
 
     # created y batches just in case if needed
@@ -269,7 +269,7 @@ def get_dense_grid_batch_processing(tensorf: TensoRFGrid):
                     torch.einsum('ryz,rx->rxyz', tensorf.yz_plane[0, :, start_y:end_y, start_z:end_z], tensorf.x_vec[0,:,start_x:end_x,0]),
                 ])
                 sub_grid = torch.einsum('rxyz,rc->cxyz', feat, tensorf.f_vec)[None]
-                result_grid[:, :, start_x:end_x, start_y:end_y, start_z:end_z] = sub_grid
+                result_grid[:, :, start_x:end_x, start_y:end_y, start_z:end_z] = sub_grid[:, :num_dim, :, :, :]
     return result_grid
 
 if __name__ == "__main__":

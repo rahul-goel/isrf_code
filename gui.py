@@ -11,6 +11,7 @@ STATE = {
 
     "fg_kmeans": None,
     "fg": None,
+    "valid_idx": None,
 
     "og_density_grid": None,
     "prev_mask": None,
@@ -173,7 +174,7 @@ def change_image_callback(sender, app_data):
         rgbs, features = rgbs.squeeze(0), features.squeeze(0)
         rgbs = np.concatenate([rgbs, np.ones_like(rgbs[:,:,0:1])], -1)
         STATE["rgbs"][idx] = rgbs.transpose((0, 1, 2))
-        STATE["features"][idx] = features
+        STATE["features"][idx] = features[:, :, :STATE["dino_dim"]]
     
     STATE["rgbs"][idx][STATE["stroke_index"][idx]] = STATE["stroke_color"]
     dpg.set_value("image", STATE["rgbs"][idx].reshape(-1))
@@ -222,12 +223,11 @@ def hcr_callback(sender, app_data):
         STATE["faiss_kmeans"] = run.do_kmeans_clustering_multiview(STATE["stroke_index"], STATE["features"])
 
         thresh = dpg.get_value("threshold")
-        mask = run.query_kmeans_clustering(STATE["faiss_kmeans"], STATE["fg_kmeans"], thresh, STATE["og_density_grid"].shape[2:])
+        mask = run.query_kmeans_clustering(STATE["faiss_kmeans"], STATE["fg_kmeans"], STATE["valid_idx"], thresh, STATE["og_density_grid"].shape[2:])
         times.append(time.time())
 
         STATE["prev_mask"] = STATE["rvk"]["model"].segmentation_mask.cpu()
         STATE["rvk"]["model"].segmentation_mask = torch.nn.Parameter(mask, requires_grad=False)
-        # STATE["rvk"]["model"].density.grid *= mask.cpu()
         STATE["rvk"]["model"].density.grid = torch.nn.Parameter(STATE["rvk"]["model"].density.grid * mask)
 
         STATE["rgbs"].clear()
@@ -262,12 +262,13 @@ if __name__ == "__main__":
         parser = run.config_parser()
         args = parser.parse_args()
 
+        STATE["dino_dim"] = args.dino_dim
         STATE["cfg"], STATE["data_dict"], STATE["device"] = run.do_setup(args)
         STATE["rvk"], STATE["optimizer"], STATE["start"] = run.load_model(args, STATE["cfg"], STATE["data_dict"], STATE["device"])
         STATE["og_density_grid"] = STATE["rvk"]["model"].density.grid.clone().cpu()
         STATE["positive_buffer"] = STATE["rvk"]["model"].segmentation_mask.clone()
         STATE["negative_buffer"] = 1.0 - STATE["rvk"]["model"].segmentation_mask.clone()
-        STATE["fg"], STATE["fg_kmeans"] = run.reconstruct_feature_grid(STATE["rvk"])
+        STATE["fg"], STATE["fg_kmeans"], STATE["valid_idx"] = run.reconstruct_feature_grid(STATE["rvk"], STATE["dino_dim"])
         STATE["height"], STATE["width"] = STATE["data_dict"]["HW"][0]
         STATE["height"], STATE["width"] = int(STATE["height"]), int(STATE["width"])
         STATE["channels"] = 4
