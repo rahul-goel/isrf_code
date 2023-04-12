@@ -85,6 +85,8 @@ def config_parser():
                         help='file path for the feature vector to use for segmentation')
     parser.add_argument("--stop_at", type=int,
                         help='at what iteration to stop training.')
+    parser.add_argument("--dino_dim", type=int, default=64,
+                        help='number of dimensions to use for segmentaiton in the interactive mode.')
     return parser
 
 
@@ -1051,18 +1053,21 @@ def render_images(render_viewpoints_kwargs: dict, cfg, data_dict: dict, imageset
     return rgbs, features
 
 @torch.no_grad()
-def reconstruct_feature_grid(render_viewpoints_kwargs):
+def reconstruct_feature_grid(render_viewpoints_kwargs, num_dim=64):
     model = render_viewpoints_kwargs['model']
 
     f_k0 = model.f_k0.cuda()
-    fg = get_dense_grid_batch_processing(f_k0).cuda()
+    fg = get_dense_grid_batch_processing(f_k0, num_dim).cuda()
 
-    fg_kmeans = fg.clone()
+    density = model.density.grid
+    valid_idx = (density > 0.1).squeeze().squeeze()
+
+    fg_kmeans = fg.cpu().clone()
     fg_kmeans = fg_kmeans.squeeze(0).permute(1, 2, 3, 0) # x, y, z, 64
-    fg_kmeans = fg_kmeans.reshape(-1, 64)
-    fg_kmeans = fg_kmeans.cpu().contiguous()
+    fg_kmeans = fg_kmeans[valid_idx.cpu()]
+    fg_kmeans = fg_kmeans.contiguous()
 
-    return torch.nn.functional.pad(fg, [1] * 6), fg_kmeans
+    return torch.nn.functional.pad(fg, [1] * 6), fg_kmeans, valid_idx
 
 @torch.no_grad()
 def do_kmeans_clustering(mask_index, feature_image):
@@ -1092,13 +1097,13 @@ def do_kmeans_clustering_multiview(indices, fimages):
     return faiss_kmeans
 
 @torch.no_grad()
-def query_kmeans_clustering(faiss_kmeans, fg_kmeans, threshold, xyz):
-    mask = query_kmeans(faiss_kmeans, fg_kmeans, threshold, xyz)
+def query_kmeans_clustering(faiss_kmeans, fg_kmeans, valid_idx, threshold, xyz):
+    mask = query_kmeans(faiss_kmeans, fg_kmeans, valid_idx, threshold, xyz)
     return mask
 
 @torch.no_grad()
-def run_region_grower(mask, fg, sigma_d, sigma_f):
-    mask = dev_region_grower_mask(mask, fg, sigma_d, sigma_f, False)
+def run_region_grower(mask, fg, density, sigma_d, sigma_f):
+    mask = dev_region_grower_mask(mask, fg, density, sigma_d, sigma_f, False)
     torch.cuda.empty_cache()
     return mask
 

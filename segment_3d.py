@@ -38,36 +38,31 @@ def hybrid_nnfm(model, thresh, fv, sigma_d = 5.0, sigma_f = 1.0):
 def kmeans(fv):
     print("Buliding K Means Model.")
     start_time = time()
+
+    dim = fv.shape[0]
     fv = fv.cpu()
-    fv = fv.reshape(64, -1)
+    fv = fv.reshape(dim, -1)
     fv = fv.permute(1, 0)
-    # kmeans = faiss.Kmeans(d=64, k=11, niter=300, nredo=10, gpu=True)
-    kmeans = faiss.Kmeans(d=64, k=11, niter=100, nredo=1, gpu=True)
-    # kmeans = faiss.Kmeans(d=64, k=11, niter=300, nredo=10)
-    # kmeans.train(fv.contiguous().numpy())
+    kmeans = faiss.Kmeans(d=dim, k=11, niter=100, nredo=1, gpu=True)
     kmeans.train(fv.contiguous())
+
     print("K Means Model Ready.", time() - start_time)
     return kmeans
 
 @torch.no_grad()
-def query_kmeans(kmeans, fg, thresh, xyz):
+def query_kmeans(kmeans, fg, valid_idx, thresh, xyz):
     print("Querying the feature grid points.")
     start_time = time()
-    # xyz = fg.shape[2:]
-    # fg = fg.squeeze(0).permute(1, 2, 3, 0) # x, y, z, 64
-    # fg = fg.reshape(-1, 64)
 
-    # dist, _ = kmeans.index.search(fg, 1)
-    # fg = fg.contiguous()
     dist, _ = kmeans.index.search(fg, 1)
     dist = torch.tensor(dist)
     print("Predicted the feature grid points.", time() - start_time)
     print("Creating mask using the queried distance.")
     start_time = time()
-    mask = (dist < thresh).float()
-    mask = mask.reshape([1, 1, *xyz])
-    # fg = fg.reshape(1, *xyz, 64)
-    # fg = fg.permute([0, 4, 1, 2, 3])
+    valid_mask = (dist < thresh).float()
+    mask = torch.zeros([1, 1, *xyz])
+    mask[:, :, valid_idx] = valid_mask.squeeze(-1)
+
     print("Created mask using the queried distance.", time() - start_time)
     return mask
 
