@@ -2,6 +2,8 @@
 
 [Project Page](https://rahul-goel.github.io/isrf) | [Arxiv](https://arxiv.org/abs/2212.13545) | [Data](https://iiitaphyd-my.sharepoint.com/:f:/g/personal/rahul_goel_research_iiit_ac_in/Es4qJ_plQY1Pnqw_OwSzqNQBdtiFrBLUlLi_Da8Fn2Ukvw?e=9AA6M6)
 
+**NOTE:**: The code has been further updated and optimized. Support for lower end GPUs has been added at the cost of accuracy. Please refer to [changelog.md file](https://github.com/rahul-goel/isrf_code/blob/main/changelog.md).
+
 ### GUI TOOL For segmentation
 
 Demonstration on the GARDEN scene. This shows the demonstration of positive and negative strokes.
